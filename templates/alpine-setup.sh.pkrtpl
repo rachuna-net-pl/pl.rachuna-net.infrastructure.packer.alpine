@@ -1,0 +1,27 @@
+#!/bin/sh
+
+set -ex
+
+# Update apk repositories
+sed -r -i '\|/v[0-9]+\.[0-9]+/community|s|^#\s?||g' /etc/apk/repositories
+apk update
+apk add \
+  bash \
+  qemu-guest-agent \
+  openssh \
+  openssl \
+  python3 \
+  shadow \
+  sudo \
+
+# Configure qemu-guest-agent
+echo -e GA_PATH="/dev/vport2p1" >> /etc/conf.d/qemu-guest-agent
+rc-update add qemu-guest-agent
+rc-service qemu-guest-agent restart
+
+# Create technician user
+adduser -D "${ ssh_username }"
+addgroup "${ ssh_username }" wheel
+HASH=$(openssl passwd -6 "${ ssh_password }")
+usermod -p "$HASH" "${ ssh_username }"
+echo '%wheel ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers

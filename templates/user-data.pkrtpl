@@ -1,0 +1,62 @@
+#cloud-config
+autoinstall:
+  preserve_hostname: false
+  create_hostname_file: false
+  prefer_fqdn_over_hostname: false
+  manage_etc_hosts: false
+
+  version: 1
+  locale: ${locale}
+  keyboard:
+    layout: ${keyboard_layout}
+  network:
+    network:
+      version: 2
+      ethernets:
+        mainif:
+          match:
+            name: e*
+          critical: true
+          dhcp4: true
+          dhcp-identifier: mac
+  ssh:
+    install-server: true
+  codecs:
+    install: false
+  drivers:
+    install: false
+  packages:
+    - qemu-guest-agent
+    - openssh-server
+  storage:
+    layout:
+      name: direct
+    swap:
+      size: 0
+  late-commands:
+    - sed -ie 's/GRUB_CMDLINE_LINUX=.*/GRUB_CMDLINE_LINUX="net.ifnames=0 ipv6.disable=1 biosdevname=0"/' /target/etc/default/grub
+    - curtin in-target --target /target update-grub2
+    - sed -r -i 's/^#?PasswordAuthentication.*/PasswordAuthentication yes/g' /target/etc/ssh/sshd_config
+    - sed -r -i 's/^#?PermitRootLogin.*/PermitRootLogin yes/g' /target/etc/ssh/sshd_config
+    - sed -r -i 's/^#?UsePAM.*/UsePAM yes/g' /target/etc/ssh/sshd_config
+    - curtin in-target --target /target systemctl enable sshd
+    - curtin in-target --target /target systemctl restart sshd
+  updates: security
+
+# Poprawna składnia dla user-data
+  user-data:
+    package_upgrade: true
+    disable_root: false
+    timezone: ${timezone}
+    users:
+      - name: root
+        shell: /bin/bash      
+        %{ if ssh_public_key != "" }
+        ssh_authorized_keys:
+          - ${ssh_public_key}
+        %{ endif }
+        %{ if root_password != "" }
+        lock_passwd: false
+        passwd: "${root_password}"
+        expire: false
+        %{ endif }
